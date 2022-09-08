@@ -1,0 +1,74 @@
+部署zabbix客户端
+一、yum安装
+# 信息
+10.0.1.51
+zbz-agent01
+# yum源配置，防火墙关闭
+
+# 注意时间正确
+yum install ntpdate -y
+ntpdate -u ntp.aliyun.com
+mv /etc/localtime{,.bak}
+ln -s /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+
+1.安装agent2
+yum install zabbix-agent2 -y
+
+2.配置文件了解
+默认配置文件为 /etc/zabbix/zabbix_agent2.conf
+
+默认二进制文件为 /usr/sbin/zabbix_agent2
+
+3.启动agent2且开机自启
+systemctl enable --now zabbix-agent2
+
+4.检查端口
+[root@zbz-agent01 ~]# netstat -tunlp|grep zabbix
+tcp6 0 0 :::10050 :::*
+LISTEN 1236/zabbix_agent2
+
+5.查看systemctl管理的单元文件
+[root@zbz-agent01 ~]# cat /lib/systemd/system/zabbixagent2.
+service
+
+修改agent2配置文件，修改如下，填写zabbix-server主机ip和主机名
+[root@zbz-agent01 ~]# grep -Ev '^#|^$'
+/etc/zabbix/zabbix_agent2.conf
+PidFile=/var/run/zabbix/zabbix_agent2.pid
+LogFile=/var/log/zabbix/zabbix_agent2.log
+LogFileSize=0
+Server=10.0.1.50
+ServerActive=10.0.1.50
+Hostname=zbz-agent01
+Include=/etc/zabbix/zabbix_agent2.d/*.conf
+ControlSocket=/tmp/agent.sock
+
+Server 和 ServerActive 配置为 zabibx server 或 zabbix proxy 地址，Hostname 配置为主机名即可。
+
+Agent2 没有组件依赖，可直接拷贝编译好的二进制文件和配置文件在其他主机上运行即可。
+
+改了配置文件，注意重启agent2
+[root@zbz-agent01 ~]# systemctl restart zabbix-agent2
+
+二、检测server-client连通性
+zabbix-server
+[root@zabbix-server01 alternatives]# yum install zabbix-get -y
+[root@zabbix-server01 alternatives]# zabbix_get -s '10.0.1.51'-p 10050 -k "agent.ping"
+1
+[root@zabbix-server01 alternatives]# zabbix_get -s '10.0.1.51' -p 10050 -k "system.hostname"
+zbz-agent01
+
+三、zabbix-server监控主机
+默认zabbix5.0已经监控了自己
+
+
+解决zabbix乱码问题
+图标数据下的小白框表示乱码含义，是因为我们改了zabbix的语言为中文，服务器需要安装字体
+[root@zabbix-server01 ~]# yum -y install wqy-microhei-fonts
+[root@zabbix-server01 ~]# \cp /usr/share/fonts/wqymicrohei/
+wqy-microhei.ttc
+/usr/share/fonts/dejavu/DejaVuSans.ttf
+[root@zabbix-server01 ~]#
+
+此时zabbix已然正确展示中文数据
+
